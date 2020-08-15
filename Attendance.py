@@ -9,13 +9,16 @@ from tkinter import *
 from tkinter import messagebox
 import numpy
 import sqlite3
+import csv
+import sys
 
 root = Tk()
 root.title('CPC Attendance Sheet')
+root.iconbitmap("logo.ico")
 
 global conn
 global c
-conn = sqlite3.connect("Master.sqlite")
+conn = sqlite3.connect("../Attendance_Sheets_CPC/Master.sqlite")
 c = conn.cursor()
 
 global counter
@@ -24,6 +27,28 @@ counter = 0
 global names
 names = ""
 
+
+def daEnd(x):
+    global name_
+    global counter
+    
+    newcon = sqlite3.connect(name_)
+    c2 = newcon.cursor()
+
+    c2.execute("SELECT * FROM Attendance")
+    result = c2.fetchall()
+
+    filename = "../Attendance_Sheets_cpc" + name_[12:-6] + "csv"
+    with open(filename, 'a') as f:
+        w = csv.writer(f, dialect = "excel")
+
+        endnum = "Number in Attendance: " + str(counter)
+        firstwrite = ["Id Number", "First/Middle Name", "Last Name", "Exec", "Gen Member", "Helped", "Points", "", endnum]
+        w.writerow(firstwrite)
+        for record in result:
+            w.writerow(record)
+
+    sys.exit()
 
 def submit(ty, na, mon, day, year):
     global points
@@ -35,7 +60,7 @@ def submit(ty, na, mon, day, year):
     names = "" 
 
     na = na.lower().replace(" ", "_")
-    name_ = "istolemariahsjob/" + str(mon) + "_" + str(day) + "_" + str(year) + "_" + na + ".sqlite"
+    name_ = "../cpc_trash/" + str(mon) + "_" + str(day) + "_" + str(year) + "_" + na + ".sqlite"
     newcon = sqlite3.connect(name_)
     c2 = newcon.cursor()
     
@@ -88,9 +113,13 @@ def submit(ty, na, mon, day, year):
         global points
         global counter
 
-        if len(idnum) > 6:
+        if len(idnum) > 12:
             idnum = idnum[4:10]
-        conn = sqlite3.connect("Master.sqlite")
+
+        elif len(idnum) > 6:
+            idnum = idnum[4:-3]
+            
+        conn = sqlite3.connect("../Attendance_Sheets_CPC/Master.sqlite")
         c = conn.cursor()
         newcon = sqlite3.connect(name_)
         c2 = newcon.cursor()
@@ -103,10 +132,14 @@ def submit(ty, na, mon, day, year):
 
         def addperson(idnum, Help, first, last, gen, exe = 0, poi = 0):
             global name_
+            global names
             global nohave
+            global points
+            global counter
             nohave.destroy()
-            
-            conn = sqlite3.connect("Master.sqlite")
+
+            points_ = points
+            conn = sqlite3.connect("../Attendance_Sheets_CPC/Master.sqlite")
             c = conn.cursor()
             newcon = sqlite3.connect(name_)
             c2 = newcon.cursor()
@@ -132,7 +165,25 @@ def submit(ty, na, mon, day, year):
                        'helped' : Help,
                        'points' : poi
                    }
-            )
+            )#update (and make) counter
+            counter += 1
+            count.delete(0, END)
+            count.insert(0, str(counter))
+
+            name = first + " " + last + "\n"
+            names += name
+            here_label = Label(current, text = names).grid(row = 3, column = 0, columnspan = 5)
+
+            #update current points
+            c.execute("""UPDATE Master SET
+            points = :points_
+
+            WHERE id_num = :idnum
+            """,
+                  {
+                      'points_': points_,
+                      'idnum': idnum
+                  })
 
             conn.commit()
             newcon.commit()
@@ -141,6 +192,7 @@ def submit(ty, na, mon, day, year):
         if len(records) == 0:
             global nohave 
             nohave = Toplevel()
+            nohave.iconbitmap("logo.ico")
             l = Label(nohave, text = "We don't have you in our system!! We need some info real quick!")
             l.grid(row = 0, column = 0, columnspan = 5, padx = 10 , pady = 10)
             f_l = Label(nohave, text = "First Name").grid(row = 1, column = 0)
@@ -210,6 +262,7 @@ def submit(ty, na, mon, day, year):
 
         
     main = Toplevel()
+    main.iconbitmap("logo.ico")
     main.title('Swipe, Swipe, Swipe!')
 
     Help = IntVar()
@@ -219,9 +272,19 @@ def submit(ty, na, mon, day, year):
     check = Checkbutton(main, text = "Check if they helped", variable = Help, offvalue = 0, onvalue = 1)
     check.grid(row = 2, column = 0, columnspan = 5, padx = 10 , pady = 10)
     check.deselect()
-    sub = Button(main, text = "Submit", padx = 20 , pady = 10, command = lambda: add(swipe.get(), Help.get())).grid(row = 3, column = 2, pady = 10)
+    
+    sub = Button(main, text = "Submit", padx = 20 , pady = 10, command = lambda: add(swipe.get(), Help.get()))
+    sub.grid(row = 3, column = 1, pady = 10)
+    end = Button(main, text = "End Program", padx = 20 , pady = 10, command = lambda: daEnd(1))
+    end.grid(row = 3, column = 3, pady = 10)
+    
+    def addsub(crap):
+        q = add(swipe.get(), Help.get())
+    swipe.bind("<Return>", addsub)
 
     current = Toplevel()
+    current.title('Right now we have...')
+    current.iconbitmap("logo.ico")
     current.title('Current Attendance')
     l1 = Label(current, text = "Total number in attendance:").grid(row = 0, column = 0, columnspan = 5, padx = 20, pady = 10)
     count = Entry(current, width = 20)
@@ -230,6 +293,7 @@ def submit(ty, na, mon, day, year):
 
     
     newcon.commit()
+    main.mainloop()
     #newcon.close()
     
 
@@ -242,39 +306,48 @@ def submit(ty, na, mon, day, year):
 
 intro = "It's already time for another event?! Well lets get started"
     
-l = Label(root, text = intro).grid(row = 0, column = 0, columnspan = 5, padx = 10 , pady = 10)
+l = Label(root, text = intro).grid(row = 0, column = 0, columnspan = 5, padx = 10 , pady = 20)
 
 eventtype = StringVar()
 eventtype.set("Rotational")
 listofevents = ["Rotational", "First Friday", "Movie", "Gen Meeting", "Other"]
 typeofevent = OptionMenu(root, eventtype, *listofevents)
-typeofevent.grid(row = 1, column = 2, padx = 10 , pady = 10)
+typeofevent.grid(row = 2, column = 1, columnspan = 3, padx = 10)
 
-toe_l = Label(root, text = "type of event").grid(row = 2, column = 0, columnspan = 5, padx = 10 , pady = 10)
+toe_l = Label(root, text = "Type of event:").grid(row = 1, column = 2)
 nameofevent = Entry(root, width = 70)
-nameofevent.grid(row = 3, column = 0, columnspan = 5, padx = 20, pady = 10)
-noe_l = Label(root, text = "Name of event").grid(row = 4, column = 0, columnspan = 5, padx = 10 , pady = 10)
+nameofevent.grid(row = 5, column = 0, columnspan = 5, padx = 20)
+noe_l = Label(root, text = "Name of event:").grid(row = 4, column = 2)
+Label(root, text = " ").grid(row = 3, column = 0)
+Label(root, text = " ").grid(row = 6, column = 0)
+Label(root, text = " ").grid(row = 9, column = 0)
 
 month = IntVar()
 month.set(8)
 n_m = numpy.arange(1, 13, 1)
 month_ = OptionMenu(root, month, *n_m)
-month_.grid(row = 5, column = 0, padx = 10 , pady = 10)
-m_l = Label(root, text = "Month").grid(row = 6, column = 0, padx = 10 , pady = 10)
+month_.grid(row = 7, column = 0, padx = 10 , pady = 10)
+m_l = Label(root, text = "Month").grid(row = 8, column = 0, padx = 10)
 day = IntVar()
 day.set(16)
 n_d = numpy.arange(1, 32, 1)
 day_ = OptionMenu(root, day, *n_d)
-day_.grid(row = 5, column = 2, padx = 10 , pady = 10)
-d_l = Label(root, text = "Day").grid(row = 6, column = 2, padx = 10 , pady = 10)
+day_.grid(row = 7, column = 2, padx = 10 , pady = 10)
+d_l = Label(root, text = "Day").grid(row = 8, column = 2, padx = 10)
 year = IntVar()
 year.set(2020)
 n_y = numpy.arange(2020, 2031, 1)
 year_ = OptionMenu(root, year, *n_y)
-year_.grid(row = 5, column = 4, padx = 10 , pady = 10)
-y_l = Label(root, text = "Year").grid(row = 6, column = 4, padx = 10 , pady = 10)
+year_.grid(row = 7, column = 4, padx = 10 , pady = 10)
+y_l = Label(root, text = "Year").grid(row = 8, column = 4, padx = 10)
 
-button_submit = Button(root, text = "Submit", padx = 20 , pady = 10, command = lambda: submit(eventtype.get(), nameofevent.get(), month.get(), day.get(), year.get())).grid(row = 7, column = 2, pady = 10)
-button_exit = Button(root, text = "Exit", padx = 20 , pady = 10, command = root.quit).grid(row = 8, column = 2, pady = 10)
+button_submit = Button(root, text = "Submit", padx = 20 , pady = 10, command = lambda: submit(eventtype.get(), nameofevent.get(), month.get(), day.get(), year.get())).grid(row = 10, column = 2, pady = 10)
+
+
+def subsub(crap):
+    pp = submit(eventtype.get(), nameofevent.get(), month.get(), day.get(), year.get())
+nameofevent.bind("<Return>", subsub)
+
+button_exit = Button(root, text = "Exit", padx = 20 , pady = 10, command = root.quit).grid(row = 11, column = 2, pady = 10)
 
 root.mainloop()

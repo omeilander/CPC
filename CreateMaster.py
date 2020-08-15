@@ -8,7 +8,7 @@ Created on Sat Jun 13 19:48:45 2020
 import sqlite3
 import csv
 
-conn = sqlite3.connect('Master.sqlite')
+conn = sqlite3.connect('../Attendance_Sheets_CPC/Master.sqlite')
 cur = conn.cursor()
 
 cur.execute('DROP TABLE IF EXISTS Master')
